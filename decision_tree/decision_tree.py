@@ -20,7 +20,12 @@ def conditional_entropy(bef_prob, joint_prob) :
         p1 = bef_prob[i]
         for j in range(len(joint_prob[0])) :
             p2 = joint_prob[i][j] / p1
-            result += p1 * -1 * p2 * (math.log(p2) / math.log(len(joint_prob[0])))
+            try :
+                # p2가 0일 경우 log 에러 발생
+                result += p1 * -1 * p2 * (math.log(p2) / math.log(len(joint_prob[0])))
+            except Exception as e:
+                print(e)
+                return 1.0
 
     return result
 
@@ -79,14 +84,41 @@ def inf_gain(factor_idx, datas) :
 
     ori_entropy = cal_entropy(list(y_dic.values())) # H(Y)
 
-    print(ori_entropy)
-    
+    #print(ori_entropy)
+
     x_list, y_list, bef_prob, joint_prob = make_conditional_set(factor_idx, datas)
 
     af_entropy = conditional_entropy(bef_prob, joint_prob) # H(Y|A_i)
 
     # IG(Y, A_i) = H(Y) - H(Y|A_i)
     return ori_entropy - af_entropy
+
+class DecisionTree :
+    def __init__(self, datas) :
+        self.datas = datas
+        self.tree = {}
+        self.av_x = [] # 범주형 자료인 x의 idx
+
+    def make_tree(self) :
+
+        # 루트 노드 만들기
+        root_x = None
+        max_ig = 0
+        for i in range(len(datas[0]['x'])) :
+            ig = inf_gain(i, self.datas)
+            print(ig)
+
+            if ig > 0 :
+                self.av_x.append(i)
+
+                if ig > max_ig :
+                    max_ig = ig
+                    root_x = i
+
+
+        print(root_x)
+        print(self.av_x)
+
 
 if __name__ == "__main__" :
     credit = credit_loader.process_credit()
@@ -98,4 +130,6 @@ if __name__ == "__main__" :
 
         datas.append({'x': credit[i][:-1], 'y': credit[i][len(credit[0]) - 1:][0]})
 
-    print(inf_gain(8, datas))
+    dt = DecisionTree(datas)
+
+    dt.make_tree()
