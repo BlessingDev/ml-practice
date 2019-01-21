@@ -1,5 +1,6 @@
 import credit_loader
 import math
+import random
 from collections import defaultdict
 
 def cal_entropy(list_of_prob_num) :
@@ -97,7 +98,93 @@ class DecisionTree :
     def __init__(self, datas) :
         self.datas = datas
         self.tree = {}
-        self.av_x = [] # 범주형 자료인 x의 idx
+        self.cate_x = [] # 범주형 자료인 x의 idx
+
+    def _get_x(self, x_idx, cur_datas) :
+        x_dic = defaultdict(lambda : 0)
+        for d in cur_datas :
+            x_dic[d['x'][x_idx]] += 1
+
+        return list(x_dic.keys())
+
+    def _get_y(self) :
+        y_dic = defaultdict(lambda : 0)
+        for d in self.datas :
+            y_dic[d['y']] += 1
+
+        return list(y_dic.keys())
+
+    def _determine_leaf_node(self, x_idx, cur_datas):
+        y_count_dic = defaultdict(lambda : defaultdict(lambda : 0)) # 각 x에 대한 y의 각 값의 개수를 셀 dictionary
+
+        for d in cur_datas :
+            x_val = d['x'][x_idx]
+            y_count_dic[x_val][d['y']] += 1
+
+        x_list = self._get_x(x_idx, cur_datas)
+        for x in x_list :
+            if len(y_count_dic[x].keys()) > 1 :
+                return (False, y_count_dic)
+
+        return (True, y_count_dic)
+
+    def _get_sub_set(self, x_idx, x_val, cur_datas):
+        # x_idx의 값이 x_val인 data를 cur_datas에서 찾아서 반환한다
+        new_data = []
+        for d in cur_datas :
+            if d['x'][x_idx] == x_val :
+                new_data.append(d)
+
+        return new_data
+
+    def _make_leaf_node(self, tree, x_list, y_count_dic):
+        for x in x_list:
+            y_sorted_list = sorted([(k, y_count_dic[x][k]) for k in y_count_dic[x].keys()], key=lambda x: x[1],
+                                   reverse=True)
+            tree[x] = y_sorted_list[0][0]
+
+    def _make_node(self, tree, x_idx, cur_datas, av_x) :
+        av_x.remove(x_idx)
+
+        is_leaf, y_count_dic = self._determine_leaf_node(x_idx, cur_datas)
+
+        print()
+        print('tree log', x_idx, dict(y_count_dic))
+        print(self.tree)
+        print()
+
+        if not is_leaf\
+            or len(av_x) > 0 :
+            # 먼저 현재 노드가 단말 노드가 되는지 확인한다
+            # 그리고 탐색가능한 노드가 비어있지 않은지 확인한다
+            x_list = self._get_x(x_idx, cur_datas)
+
+            for x in x_list :
+                x_datas = self._get_sub_set(x_idx, x, cur_datas)
+
+                max_gain = 0.0
+                ig_idx = -1
+                for de_x in av_x :
+                    # 현재 탐색 가능한 x에 대해 가장 높은 ig를 얻을 수 있는 x를 찾는다
+                    ig = inf_gain(de_x, x_datas)
+
+                    if ig > max_gain :
+                        max_gain = ig
+                        ig_idx = de_x
+                
+                if ig_idx == -1 :
+                    # ig를 얻을 수 없었다면
+                    self._make_leaf_node(tree, x_list, y_count_dic)
+                else :
+                    # ig를 얻었다면
+                    # 최종적으로 가장 많은 ig를 얻은 factor에 대해 node를 구성
+                    tree[x] = (ig_idx, {})
+                    self._make_node(tree[x][1], ig_idx, x_datas, list(av_x))
+        else :
+            x_list = self._get_x(x_idx, cur_datas)
+
+            self._make_leaf_node(tree, x_list, y_count_dic)
+
 
     def make_tree(self) :
 
@@ -109,7 +196,7 @@ class DecisionTree :
             print(ig)
 
             if ig > 0 :
-                self.av_x.append(i)
+                self.cate_x.append(i)
 
                 if ig > max_ig :
                     max_ig = ig
@@ -117,8 +204,21 @@ class DecisionTree :
 
 
         print(root_x)
-        print(self.av_x)
+        print(self.cate_x)
 
+        av_x = list(self.cate_x)
+        self.tree = (root_x, {})
+        self._make_node(self.tree[1], root_x, self.datas, av_x)
+
+        print(self.tree)
+
+    def determine(self, x_factors) :
+        cur_node = self.tree
+
+        while str(type(cur_node)) == "<class 'tuple'>" :
+            cur_node = cur_node[1][x_factors[cur_node[0]]]
+
+        return cur_node
 
 if __name__ == "__main__" :
     credit = credit_loader.process_credit()
@@ -130,6 +230,19 @@ if __name__ == "__main__" :
 
         datas.append({'x': credit[i][:-1], 'y': credit[i][len(credit[0]) - 1:][0]})
 
-    dt = DecisionTree(datas)
+    random.shuffle(datas)
+
+    div_idx = int(len(datas) * 0.8)
+    train_data, test_data = datas[:div_idx], datas[div_idx:]
+
+    dt = DecisionTree(train_data)
 
     dt.make_tree()
+
+    coll_num = 0
+    for d in test_data :
+        prediction = dt.determine(d['x'])
+        if prediction == d['y'] :
+            coll_num += 1
+
+    print('accuracy:', float(coll_num) / len(test_data))
