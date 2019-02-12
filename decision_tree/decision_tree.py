@@ -1,4 +1,4 @@
-import credit_loader
+import csv_loader
 import math
 import random
 from collections import defaultdict
@@ -107,13 +107,6 @@ class DecisionTree :
 
         return list(x_dic.keys())
 
-    def _get_y(self) :
-        y_dic = defaultdict(lambda : 0)
-        for d in self.datas :
-            y_dic[d['y']] += 1
-
-        return list(y_dic.keys())
-
     def _determine_leaf_node(self, x_idx, cur_datas):
         y_count_dic = defaultdict(lambda : defaultdict(lambda : 0)) # 각 x에 대한 y의 각 값의 개수를 셀 dictionary
 
@@ -221,7 +214,9 @@ class DecisionTree :
         return cur_node
 
 if __name__ == "__main__" :
-    credit = credit_loader.process_credit()
+    credit = csv_loader.process_credit()
+
+    print(cal_entropy([4, 7]))
 
     print(len(credit))
     #print(credit)
